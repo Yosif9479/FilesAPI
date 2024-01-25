@@ -1,5 +1,8 @@
 ﻿using FilesAPI.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.IO;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace FilesAPI.Controllers
 {
@@ -14,17 +17,18 @@ namespace FilesAPI.Controllers
             _databaseContext = databaseContext;
         }
 
-        [HttpPost("Upload")]
-        public IActionResult UploadFile([FromBody] string fileName)
+        [HttpPost]
+        public async Task<IActionResult> UploadFile([Bind("formFile")] IFormFile formFile)
         {
-            string path = Directory.GetCurrentDirectory() + "/Files/Storage/" + fileName;
-
-            FileInfo fileInfo = new FileInfo(path);
             FileModel file = new FileModel();
 
-            file.Data = System.IO.File.ReadAllBytes(path);
-            file.Name = fileInfo.Name;
-            file.Extension = fileInfo.Extension;
+            using (MemoryStream stream = new MemoryStream())
+            {
+                await formFile.CopyToAsync(stream);
+                file.Name = formFile.FileName;
+                file.Extension = formFile.FileName.Split('.')[formFile.FileName.Split('.').Length - 1];
+                file.Data = stream.ToArray();
+            }
 
             _databaseContext.Files.Add(file);
             _databaseContext.SaveChanges();
@@ -36,6 +40,7 @@ namespace FilesAPI.Controllers
         public IActionResult DownloadFile(string fileName) 
         {
             string path = Directory.GetCurrentDirectory() + "/Files/Downloads/" + fileName;
+
             FileModel? file = _databaseContext.Files.FirstOrDefault(c => c.Name == fileName);
 
             if (file == null) 
